@@ -1,0 +1,11 @@
+data/
+output.txt
+output3.txt
+hw1.jar
+build.sbt
+target/
+out/
+.idea/
+.bsp/
+project/
+

@@ -1,0 +1,8 @@
+venv/
+data/
+output.txt
+output_3.txt
+output_w.txt
+output_wo.txt
+.DS_Store
+.idea/
