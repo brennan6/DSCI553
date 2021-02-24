@@ -1,0 +1,6 @@
+data/
+venv/
+.idea/
+output1.txt
+.DS_Store
+
