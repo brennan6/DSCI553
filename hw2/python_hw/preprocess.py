@@ -26,7 +26,6 @@ if __name__ == "__main__":
         .map(lambda x: json.loads(x))\
         .map(lambda reviews_kv: (reviews_kv["user_id"], reviews_kv["business_id"]))\
         .filter(lambda uid_bid: uid_bid[1] in rdd_business_nv)\
-        .distinct()\
         .collect()
 
     with open(output_fp, "w") as user_business_file:

@@ -35,11 +35,11 @@ if __name__ == "__main__":
     result = model.freqItemsets().collect()
 
     fi_items_task3 = []
-    with open("output3_results.txt", "w") as w:
-        for fi in result:
-            fi_items_task3.append(fi)
-            w.write(str(fi) + "\n")
-    print(fi_items_task3)
+    #with open("output3_results.txt", "w") as w:
+        #for fi in result:
+            #fi_items_task3.append(fi)
+            #w.write(str(fi) + "\n")
+    #print(fi_items_task3)
 
     fi_items_task2 = []
     with open("saved_task2.txt", "r") as f:
