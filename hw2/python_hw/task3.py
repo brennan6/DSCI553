@@ -1,18 +1,19 @@
-from pyspark import SparkContext, SparkConf, StorageLevel
-from itertools import combinations
-import math
+from pyspark import SparkContext, SparkConf
 import sys
-import numpy as np
 from pyspark.mllib.fpm import FPGrowth
 import time
 
-
 if __name__ == "__main__":
     start = time.time()
-    filter_threshold = int("70")
-    support = int("50")
-    input_fp = "./data/user_business.csv"
-    output_fp = "./output3.txt"
+    filter_threshold = int(sys.argv[1])
+    support = int(sys.argv[2])
+    input_fp = sys.argv[3]
+    output_fp = sys.argv[4]
+
+    #filter_threshold = int("70")
+    #support = int("50")
+    #input_fp = "./data/user_business.csv"
+    #output_fp = "./output3.txt"
 
     configuration = SparkConf()
     configuration.set("spark.driver.memory", "10g")
@@ -45,16 +46,19 @@ if __name__ == "__main__":
         else:
             fi_items_task3.append(str(tuple(fi_items)))
 
-    print(fi_items_task3)
+    #print(fi_items_task3)
     fi_items_task2 = []
     with open("saved_task2.txt", "r") as f:
         for line in f:
             fi_items_task2.append(line.strip())
 
     intersection = set(fi_items_task3).intersection(set(fi_items_task2))
-    print(intersection)
+    #print(intersection)
 
     with open(output_fp, "w") as w:
         w.write("Task 2," + str(len(fi_items_task2)) + "\n")
         w.write("Task 3," + str(len(fi_items_task3)) + "\n")
         w.write("Intersection," + str(len(intersection)))
+
+    end = time.time()
+    print("Duration:", round((end-start),2))

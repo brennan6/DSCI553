@@ -27,7 +27,7 @@ def get_candidates_apriori(baskets, s, total_basket_count):
                     yield (elem, 1)
 
     #print("support threshold partition:", threshold)
-    print("1 len candidates: ", len(cand_lst))
+    #print("1 len candidates: ", len(cand_lst))
 
     cand_set_singletons = sorted(list(set(cand_lst))) #Removes duplicates from list of singletons
     pairs_possible = sorted(list(combinations(cand_set_singletons, 2)))
@@ -75,7 +75,7 @@ def get_candidates_apriori(baskets, s, total_basket_count):
                 else:
                     continue
 
-        print(str(size) + " len candidates: ", len(cand_set_non_singletons))
+        #print(str(size) + " len candidates: ", len(cand_set_non_singletons))
         size += 1
         pairs_possible = sorted(list(set(pairs_possible)))
         cand_set_singletons = sorted(list(set([item for tup in pairs_possible for item in tup])))
@@ -119,7 +119,7 @@ def format_output(w, starter_str, singletons, non_singletons):
             w.write(str_)
             cnt += 1
         else:
-            str_ = "('" + fi + "')\n"
+            str_ = "('" + fi + "')\n\n"
             w.write(str_)
     size = 2
     while size <= max_len:
@@ -148,16 +148,21 @@ def format_output(w, starter_str, singletons, non_singletons):
                     if i < len(fi_pair) - 1:
                         str_ = str_ + "'" + str(fi_pair[i]) + "', "
                     else:
-                        str_ = str_ + "'" + str(fi_pair[i]) + "')\n"
+                        str_ = str_ + "'" + str(fi_pair[i]) + "')\n\n"
                 w.write(str_)
         size += 1
 
 if __name__ == "__main__":
     start = time.time()
-    filter_threshold = int("70")
-    support = int("50")
-    input_fp = "./data/user_business.csv"
-    output_fp = "./output2.txt"
+    filter_threshold = int(sys.argv[1])
+    support = int(sys.argv[2])
+    input_fp = sys.argv[3]
+    output_fp = sys.argv[4]
+
+    #filter_threshold = int("70")
+    #support = int("50")
+    #input_fp = "./data/user_business.csv"
+    #output_fp = "./output2.txt"
 
     configuration = SparkConf()
     configuration.set("spark.driver.memory", "10g")

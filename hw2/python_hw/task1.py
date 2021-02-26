@@ -27,7 +27,6 @@ def get_candidates_apriori(baskets, s, total_basket_count):
                     yield (elem, 1)
 
     cand_set_singletons = sorted(list(set(cand_lst))) #Removes duplicates from list of singletons
-    print("cand_set_singletons:", cand_set_singletons)
     pairs_possible = sorted(combinations(cand_set_singletons, 2))
 
     size = 2
@@ -37,12 +36,8 @@ def get_candidates_apriori(baskets, s, total_basket_count):
 
         for basket in basket_lst:
             pruned_basket = sorted(list(set(basket).intersection(set(cand_set_singletons))))
-            #print("pruned_basket:", pruned_basket)
             combos = list(combinations(pruned_basket, size))
-            #print("combos:", combos)
-            #print("pairs possible:", pairs_possible)
             approved_combos = list(set(combos).intersection(set(pairs_possible)))
-            #print("approved_combos:", approved_combos)
             if len(approved_combos) == 0:
                 continue
             for pair in approved_combos:
@@ -115,7 +110,7 @@ def format_output(w, starter_str, singletons, non_singletons):
             w.write(str_)
             cnt += 1
         else:
-            str_ = "('" + fi + "')\n"
+            str_ = "('" + fi + "')\n\n"
             w.write(str_)
     size = 2
     while size <= max_len:
@@ -144,16 +139,20 @@ def format_output(w, starter_str, singletons, non_singletons):
                     if i < len(fi_pair) - 1:
                         str_ = str_ + "'" + str(fi_pair[i]) + "', "
                     else:
-                        str_ = str_ + "'" + str(fi_pair[i]) + "')\n"
+                        str_ = str_ + "'" + str(fi_pair[i]) + "')\n\n"
                 w.write(str_)
         size += 1
 
 if __name__ == "__main__":
     start = time.time()
-    case_number = "1"
-    support = int("5")
-    input_fp = "./data/small2.csv"
-    output_fp = "./output1.txt"
+    case_number = sys.argv[1]
+    support = int(sys.argv[2])
+    input_fp = sys.argv[3]
+    output_fp = sys.argv[4]
+    #case_number = "1"
+    #support = int("5")
+    #input_fp = "./data/small2.csv"
+    #output_fp = "./output1.txt"
     sc = SparkContext('local[*]', 'task1')
 
     input_rdd = sc.textFile(input_fp)
