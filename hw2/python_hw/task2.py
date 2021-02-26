@@ -12,7 +12,7 @@ def get_candidates_apriori(baskets, s, total_basket_count):
     basket_lst = list(baskets)
     cnt = {}
     cand_lst = []
-    threshold = math.floor(s*(len(basket_lst)/total_basket_count))
+    threshold = math.ceil(s*(len(basket_lst)/total_basket_count))
     for basket in basket_lst:
         for elem in basket:
             if elem in cnt:
@@ -29,8 +29,8 @@ def get_candidates_apriori(baskets, s, total_basket_count):
     #print("support threshold partition:", threshold)
     print("1 len candidates: ", len(cand_lst))
 
-    cand_set_singletons = list(set(cand_lst)) #Removes duplicates from list of singletons
-    pairs_possible = list(combinations(cand_set_singletons, 2))
+    cand_set_singletons = sorted(list(set(cand_lst))) #Removes duplicates from list of singletons
+    pairs_possible = sorted(list(combinations(cand_set_singletons, 2)))
     #print("Finished Singletons.")
 
     size = 2
@@ -41,7 +41,7 @@ def get_candidates_apriori(baskets, s, total_basket_count):
         for basket in basket_lst:
             pruned_basket = sorted(list(set(basket).intersection(set(cand_set_singletons))))
             combos = list(combinations(pruned_basket, size))
-            approved_combos = list(set(pairs_possible) & set(combos))
+            approved_combos = list(set(pairs_possible).intersection(set(combos)))
             if len(combos) == 0:
                 continue
             for pair in approved_combos:
@@ -77,8 +77,8 @@ def get_candidates_apriori(baskets, s, total_basket_count):
 
         print(str(size) + " len candidates: ", len(cand_set_non_singletons))
         size += 1
-        pairs_possible = list(set(pairs_possible))
-        cand_set_singletons = [item for tup in pairs_possible for item in tup]
+        pairs_possible = sorted(list(set(pairs_possible)))
+        cand_set_singletons = sorted(list(set([item for tup in pairs_possible for item in tup])))
         #Try flattening this set into a bucket. as new singletons
         #print("Finished size:", size)
     #print("Finished Candidates")

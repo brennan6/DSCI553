@@ -14,7 +14,10 @@ if __name__ == "__main__":
     input_fp = "./data/user_business.csv"
     output_fp = "./output3.txt"
 
-    sc = SparkContext('local[*]', 'task3')
+    configuration = SparkConf()
+    configuration.set("spark.driver.memory", "10g")
+    configuration.set("spark.executor.memory", "10g")
+    sc = SparkContext.getOrCreate(configuration)
 
     input_rdd = sc.textFile(input_fp)
     header = input_rdd.first()
@@ -32,25 +35,26 @@ if __name__ == "__main__":
     num_partitions = basket.getNumPartitions()
 
     model = FPGrowth.train(basket, min_support, num_partitions)
-    result = model.freqItemsets().collect()
+    result = sorted(model.freqItemsets().collect())
 
     fi_items_task3 = []
-    #with open("output3_results.txt", "w") as w:
-        #for fi in result:
-            #fi_items_task3.append(fi)
-            #w.write(str(fi) + "\n")
-    #print(fi_items_task3)
+    for fi in result:
+        fi_items = sorted(fi[0])
+        if len(fi_items) == 1:
+            fi_items_task3.append(fi_items[0])
+        else:
+            fi_items_task3.append(str(tuple(fi_items)))
 
+    print(fi_items_task3)
     fi_items_task2 = []
     with open("saved_task2.txt", "r") as f:
         for line in f:
             fi_items_task2.append(line.strip())
-    print(fi_items_task2)
+
+    intersection = set(fi_items_task3).intersection(set(fi_items_task2))
+    print(intersection)
 
     with open(output_fp, "w") as w:
-        w.write("Task 2: " + str(len(fi_items_task2)) + "\n")
-        w.write("Task 3: " + str(len(result)))
-
-
-
-
+        w.write("Task 2," + str(len(fi_items_task2)) + "\n")
+        w.write("Task 3," + str(len(fi_items_task3)) + "\n")
+        w.write("Intersection," + str(len(intersection)))
