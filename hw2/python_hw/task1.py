@@ -1,11 +1,10 @@
 from pyspark import SparkContext
 from itertools import combinations
 import sys
+import math
 import time
-import platform
-print(platform.python_version())
 
-def get_candidates_apriori(baskets, partitions_cnt, s):
+def get_candidates_apriori(baskets, s, total_basket_count):
     #Get Count of all candidate itemsets within partition
     #A prior: Count singletons, eliminate not plausible combos, try all for 2, then 3, etc.
     #RUN WHOLE ALGORITHM HERE, b/c still "candidates" since SOM
@@ -13,32 +12,32 @@ def get_candidates_apriori(baskets, partitions_cnt, s):
     basket_lst = list(baskets)
     cnt = {}
     cand_lst = []
-    threshold = s/partitions_cnt
+    threshold = math.floor(s*(len(basket_lst)/total_basket_count))
     for basket in basket_lst:
         for elem in basket:
-            if elem in cnt.keys():
+            if elem in cnt:
                 cnt[elem] += 1
                 if cnt[elem] >= threshold:
                     cand_lst.append(elem)
-                    yield ((elem), 1)
+                    yield (elem, 1)
             else:
                 cnt[elem] = 1
                 if cnt[elem] >= threshold:
                     cand_lst.append(elem)
-                    yield ((elem), 1)
+                    yield (elem, 1)
 
-    cand_set = list(set(cand_lst)) #Removes duplicates from list of singletons
-    pairs_possible = list(combinations(cand_set, 2))
+    cand_set_singletons = list(set(cand_lst)) #Removes duplicates from list of singletons
+    pairs_possible = list(combinations(cand_set_singletons, 2))
 
     size = 2
     while pairs_possible:
         cnt = {}
         cand_lst = []
-        if len(pairs_possible) == 0:
-            return
+
         for basket in basket_lst:
-            combos = list(combinations(basket, size))
-            approved_combos = list(set(pairs_possible) & set(combos))
+            pruned_basket = sorted(list(set(basket).intersection(set(cand_set_singletons))))
+            combos = list(combinations(pruned_basket, size))
+            approved_combos = list(set(pairs_possible) & set(combos))  #change syntax possibly
             if len(combos) == 0:
                 continue
             for pair in approved_combos:
@@ -46,29 +45,35 @@ def get_candidates_apriori(baskets, partitions_cnt, s):
                     cnt[pair] += 1
                     if cnt[pair] >= threshold:
                         cand_lst.append(pair)
-                        yield ((pair), 1)
+                        yield (pair, 1)  #Try removing parentheses
                 else:
                     cnt[pair] = 1
                     if cnt[pair] >= threshold:
                         cand_lst.append(pair)
-                        yield ((pair), 1)
+                        yield (pair, 1)
 
-        cand_set = list(set(cand_lst))
-        size += 1
+        cand_set_non_singletons = list(set(cand_lst))
 
         pairs_possible = []
-        for i, outer_tup in enumerate(cand_set[:-1]):
-            for inner_tup in cand_set[i+1:]:
+        for i, outer_tup in enumerate(cand_set_non_singletons[:-1]):
+            for inner_tup in cand_set_non_singletons[i+1:]:
                 isMergable = False
-                if inner_tup[:-1] == outer_tup[:-1]:
+                union_tup = sorted(set(outer_tup).union(set(inner_tup)))
+                if len(union_tup) == size+1:
                     isMergable = True
                 if isMergable:
-                    combination = tuple(sorted(list(set(outer_tup).union(set(inner_tup)))))
-                    pairs_possible.append(combination)
+                    combination = tuple(union_tup)
+                    union_pair_lst = []
+                    for pair in combinations(combination, size):
+                        union_pair_lst.append(pair)
+                    if set(union_pair_lst).issubset(set(cand_set_non_singletons)):
+                        pairs_possible.append(combination)
                 else:
                     continue
-
+        size += 1
+        #print(pairs_possible)
         pairs_possible = list(set(pairs_possible))
+        cand_set_singletons = [item for tup in pairs_possible for item in tup]
 
 def get_frequent_itemsets(baskets, candidates):
     basket_lst = list(baskets)
@@ -81,7 +86,7 @@ def get_frequent_itemsets(baskets, candidates):
                         cnt[cand_] += 1
                     else:
                         cnt[cand_] = 1
-            elif set(cand_).issubset(basket):
+            elif set(cand_).issubset(set(basket)):
                 if cand_ in cnt:
                     cnt[cand_] += 1
                 else:
@@ -91,7 +96,10 @@ def get_frequent_itemsets(baskets, candidates):
         yield(pair, total)
 
 def format_output(w, starter_str, singletons, non_singletons):
-    max_len = len(sorted(non_singletons, key=len)[len(non_singletons) - 1])
+    if non_singletons:
+        max_len = len(sorted(non_singletons, key=len)[len(non_singletons) - 1])
+    else:
+        max_len = 1
     w.write(starter_str)
     singletons_cnt = len(singletons)
     cnt = 0
@@ -140,7 +148,7 @@ if __name__ == "__main__":
     support = int("9")
     input_fp = "./data/small2.csv"
     output_fp = "./output1.txt"
-    sc = SparkContext('local[*]', 'task3')
+    sc = SparkContext('local[*]', 'task1')
 
     input_rdd = sc.textFile(input_fp)
     header = input_rdd.first()
@@ -163,25 +171,26 @@ if __name__ == "__main__":
             .map(lambda business_basket: (business_basket[1]))
         basket = business_basket
 
-    num_partitions = basket.getNumPartitions()
+    #num_partitions = basket.getNumPartitions()
+    total_basket_count = basket.count()
+
     candidate_itemset = basket.mapPartitions(lambda partition:
-                get_candidates_apriori(baskets=partition, partitions_cnt=num_partitions, s=support))\
+                get_candidates_apriori(baskets=partition, s=support, total_basket_count=total_basket_count))\
                 .reduceByKey(lambda x, y: x+y)\
                 .distinct()\
-                .keys()
-
-    candidates_arr = [val for val in candidate_itemset.collect()]
+                .keys()\
+                .collect()
 
     frequent_itemsets = basket.mapPartitions(lambda partition:
-                            get_frequent_itemsets(baskets=partition, candidates=candidates_arr))\
+                            get_frequent_itemsets(baskets=partition, candidates=candidate_itemset))\
                             .reduceByKey(lambda x, y: x+y)\
                             .filter(lambda key_cnt: key_cnt[1] >= support)\
                             .keys()\
                             .collect()
 
     singletons_cand = []
-    non_singletons_cand  = []
-    for cand in candidates_arr:
+    non_singletons_cand = []
+    for cand in candidate_itemset:
         if type(cand) is not tuple:
             singletons_cand.append(cand)
         else:
@@ -190,7 +199,7 @@ if __name__ == "__main__":
     singletons_cand = sorted(singletons_cand)
 
     singletons_fi = []
-    non_singletons_fi  = []
+    non_singletons_fi = []
     for freq_item in frequent_itemsets:
         if type(freq_item) is not tuple:
             singletons_fi.append(freq_item)
