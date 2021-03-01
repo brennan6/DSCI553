@@ -28,7 +28,7 @@ if __name__ == "__main__":
     basket = reviews_rdd\
         .map(lambda line: line.split(","))\
         .groupByKey()\
-        .map(lambda user_businesses: (user_businesses[0], sorted(list(user_businesses[1]))))\
+        .map(lambda user_businesses: (user_businesses[0], sorted(list(set(user_businesses[1])))))\
         .filter(lambda user_businessLst: len(user_businessLst[1]) > filter_threshold)\
         .map(lambda usr_basket: usr_basket[1]).cache()
 

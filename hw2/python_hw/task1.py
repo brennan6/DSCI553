@@ -164,7 +164,7 @@ if __name__ == "__main__":
         user_baskets = reviews_rdd\
             .map(lambda line: line.split(","))\
             .groupByKey()\
-            .map(lambda user_businesses: (user_businesses[0], sorted(list(user_businesses[1]))))\
+            .map(lambda user_businesses: (user_businesses[0], sorted(list(set(user_businesses[1])))))\
             .map(lambda usr_basket: usr_basket[1])
         basket = user_baskets
     else:
@@ -172,7 +172,7 @@ if __name__ == "__main__":
             .map(lambda line: line.split(","))\
             .map(lambda user_business: (user_business[1], user_business[0]))\
             .groupByKey()\
-            .map(lambda businesses_user: (businesses_user[0], sorted(list(businesses_user[1]))))\
+            .map(lambda businesses_user: (businesses_user[0], sorted(list(set(businesses_user[1])))))\
             .map(lambda business_basket: (business_basket[1]))
         basket = business_basket
 
@@ -215,7 +215,6 @@ if __name__ == "__main__":
 
     with open(output_fp, "w") as w:
         format_output(w, "Candidates:\n", singletons_cand, non_singletons_cand)
-        w.write("\n")
         format_output(w, "Frequent Itemsets:\n", singletons_fi, non_singletons_fi)
 
     end = time.time()

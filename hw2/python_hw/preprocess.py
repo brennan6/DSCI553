@@ -7,7 +7,7 @@ if __name__ == "__main__":
     start = time.time()
     review_fp = "./data/review.json"
     business_fp = "./data/business.json"
-    output_fp = "./data/user_business.csv"
+    output_fp = "./data/user_business_contd.csv"
 
     sc = SparkContext('local[*]', 'task2')
 
@@ -18,7 +18,6 @@ if __name__ == "__main__":
         .map(lambda x: json.loads(x))\
         .map(lambda business_kv: (business_kv["business_id"], business_kv["state"]))\
         .filter(lambda id_state: id_state[1] == "NV")\
-        .distinct()\
         .keys()\
         .collect()
 
