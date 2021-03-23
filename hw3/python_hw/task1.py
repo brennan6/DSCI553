@@ -5,10 +5,10 @@ from itertools import combinations
 import json
 import math
 import time
+import sys
 
 SIGN_COUNT = 100
 BANDS_COUNT = 50
-row = 1
 
 def get_lsh_combinations(sign_matrix):
     """Check similarity between hashed signatures across bands."""
@@ -73,12 +73,15 @@ def score_against_ground_truth(confirmed_set, b_i_grouped, t):
 
 if __name__ == "__main__":
     start = time.time()
-    input_fp = "./data/train_review.json"
-    output_fp = "./data/task1.res"
+    input_fp = sys.argv[1]
+    output_fp = sys.argv[2]
+
+    #input_fp = "./data/train_review.json"
+    #output_fp = "./data/task1.res"
     conf = SparkConf()
-    conf.set("spark.executor.memory", "4g")
-    conf.set("spark.driver.memory", "4g")
-    sc = SparkContext.getOrCreate(conf)
+    conf.set("spark.executor.memory", "8g")
+    conf.set("spark.driver.memory", "8g")
+    sc = SparkContext(conf=conf)
 
     train_rdd = sc.textFile(input_fp)
     user_business_rdd = train_rdd \
@@ -132,14 +135,12 @@ if __name__ == "__main__":
 
     with open(output_fp, "w") as w:
         for sim_set in jaccard_sim_set:
-            str_b1 = '{"b1": "' + str(sim_set[0]) + '", '
-            str_b2 = '"b2": "' + str(sim_set[1]) + '", '
-            str_sim = '"sim": "' + str(sim_set[2]) + '}'
-            w.write(str_b1 + str_b2 + str_sim + "\n")
+            w.write(json.dumps({"b1": sim_set[0], "b2": sim_set[1], "sim": sim_set[2]}) + '\n')
 
     #Score the results against ground truth:
     #score_against_ground_truth(jaccard_sim_set, b_i_grouped, .05)
 
+    w.close()
     end = time.time()
     print("Duration:", round((end-start),2))
 

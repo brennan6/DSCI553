@@ -1,12 +1,11 @@
 from pyspark import SparkContext, SparkConf
 import time
 import json
-import re
 import math
+import sys
 
 def cos_similarity(user_k, bus_k, user_features_d, bus_features_d):
     if (user_k not in user_features_d) or (bus_k not in bus_features_d):
-        print(bus_k)
         return .00001
     user_features = set(user_features_d[user_k])
     bus_features = set(bus_features_d[bus_k])
@@ -15,14 +14,19 @@ def cos_similarity(user_k, bus_k, user_features_d, bus_features_d):
     return num_/denom_
 
 if __name__ == "__main__":
+    start = time.time()
+    #input_fp = sys.argv[1]
+    #model_fp = sys.argv[2]
+    #output_fp = sys.argv[3]
+
     input_fp = "./data/test_review.json"
-    model_fp = "./data/task2_model"
-    output_fp = "./data/task2.res"
+    model_fp = "./data/task2.model"
+    output_fp = "./data/task2.predict"
 
     conf = SparkConf()
-    conf.set("spark.executor.memory", "4g")
-    conf.set("spark.driver.memory", "4g")
-    sc = SparkContext.getOrCreate(conf)
+    conf.set("spark.executor.memory", "8g")
+    conf.set("spark.driver.memory", "8g")
+    sc = SparkContext(conf=conf)
 
     # Read in test data:
     test_rdd = sc.textFile(input_fp)
@@ -52,7 +56,8 @@ if __name__ == "__main__":
 
     with open(output_fp, "w") as w:
         for u_b_sim in rec_user_businesses:
-            str_b1 = '{"b1": "' + str(u_b_sim[0]) + '", '
-            str_b2 = '"b2": "' + str(u_b_sim[1]) + '", '
-            str_sim = '"sim": "' + str(u_b_sim[2]) + '}'
-            w.write(str_b1 + str_b2 + str_sim + "\n")
+            w.write(json.dumps({"user_id": u_b_sim[0], "business_id": u_b_sim[1], "sim": u_b_sim[2]}) + '\n')
+
+    w.close()
+    end = time.time()
+    print("Duration:", round((end-start),2))
