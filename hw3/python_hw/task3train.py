@@ -10,6 +10,18 @@ import sys
 SIGN_COUNT = 50
 BANDS_COUNT = 25
 
+def minhash(business_len):
+    index_hash_dict = defaultdict(list)
+    for sig_i in range(SIGN_COUNT):
+        a = random.randint(1, 50000)
+        b = random.randint(1, 50000)
+        p = 15121
+        m = 15000
+        for idx in range(business_len):
+            index_hash_dict[idx].append(((a * idx + b) % p) % m)
+
+    return index_hash_dict
+
 def reduce_signature(signature_lsts):
     return [min(col) for col in zip(*signature_lsts)]
 
@@ -20,9 +32,6 @@ def get_lsh_combinations(sign_matrix):
     stop_idx = math.floor((SIGN_COUNT/BANDS_COUNT)-1)
     candidates = []
     for band_num in range(BANDS_COUNT):
-        #print("band num:", band_num)
-        #print("idx:", idx_)
-        #print("stop idx:", stop_idx)
         d_ = defaultdict(list)
         for sign_ in sign_matrix:
             band_sign = sign_[1][idx_:stop_idx]
@@ -86,8 +95,8 @@ if __name__ == "__main__":
     # cf_type = sys.argv[3]
 
     input_fp = "./data/train_review.json"
-    output_model = "./data/task3user.model"
-    cf_type = "user_based"
+    output_model = "./data/task3item.model"
+    cf_type = "item_based"
 
     conf = SparkConf()
     conf.set("spark.executor.memory", "8g")
@@ -138,14 +147,7 @@ if __name__ == "__main__":
         bus_idx_dict = {bus_idx[0]: bus_idx[1] for bus_idx in bus_idx_rdd.collect()}
 
         # Create Min_hash Signatures:
-        index_hash_dict = defaultdict(list)
-        for sig_i in range(SIGN_COUNT):
-            a = random.randint(1, 50000)
-            b = random.randint(1, 50000)
-            p = 15121
-            m = 15000
-            for idx in range(len(bus_idx_dict)):
-                index_hash_dict[idx].append(((a * idx + b) % p) % m)
+        index_hash_dict = minhash(len(bus_idx_dict))
 
         idx_user = user_bus_stars_rdd \
             .map(lambda u_b_s: (bus_idx_dict[u_b_s[1]], u_b_s[0]))
@@ -165,10 +167,9 @@ if __name__ == "__main__":
         cands_set = set(list(get_lsh_combinations(signature_matrix)))
 
         #Group Business Ratings for Users we need to compare:
-        print("Cand Set size:", len(cands_set))
+        #print("Cand Set size:", len(cands_set))
         output_pairs = []
-        for i, pair in enumerate(cands_set):
-            #print("Progress:", i)
+        for pair in cands_set:
             u1 = pair[0]
             u2 = pair[1]
             if u1 not in user_bus_ratings or u2 not in user_bus_ratings:

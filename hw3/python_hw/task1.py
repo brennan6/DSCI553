@@ -10,6 +10,18 @@ import sys
 SIGN_COUNT = 100
 BANDS_COUNT = 50
 
+def minhash(user_idx_len):
+    index_hash_dict = defaultdict(list)
+    for sig_i in range(SIGN_COUNT):
+        a = random.randint(1, 50000)
+        b = random.randint(1, 50000)
+        p = 22777
+        m = 20000
+        for idx in range(user_idx_len):
+            index_hash_dict[idx].append(((a * idx + b) % p) % m)
+
+    return index_hash_dict
+
 def get_lsh_combinations(sign_matrix):
     """Check similarity between hashed signatures across bands."""
     print("LSH Combinations.")
@@ -73,11 +85,11 @@ def score_against_ground_truth(confirmed_set, b_i_grouped, t):
 
 if __name__ == "__main__":
     start = time.time()
-    input_fp = sys.argv[1]
-    output_fp = sys.argv[2]
+    # input_fp = sys.argv[1]
+    # output_fp = sys.argv[2]
 
-    #input_fp = "./data/train_review.json"
-    #output_fp = "./data/task1.res"
+    input_fp = "./data/train_review.json"
+    output_fp = "./data/task1.res"
     conf = SparkConf()
     conf.set("spark.executor.memory", "8g")
     conf.set("spark.driver.memory", "8g")
@@ -98,14 +110,7 @@ if __name__ == "__main__":
     user_idx_dict = {user_id[0]: user_id[1] for user_id in user_idx_rdd.collect()}
 
     # Create Min_hash Signatures:
-    index_hash_dict = defaultdict(list)
-    for sig_i in range(SIGN_COUNT):
-        a = random.randint(1, 50000)
-        b = random.randint(1, 50000)
-        p = 22777
-        m = 20000
-        for idx in range(len(user_idx_dict)):
-            index_hash_dict[idx].append(((a * idx + b) % p) % m)
+    index_hash_dict = minhash(len(user_idx_dict))
 
     idx_business = user_business_rdd \
                 .map(lambda u_b: (user_idx_dict[u_b[0]], u_b[1]))

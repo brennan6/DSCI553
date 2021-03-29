@@ -3,6 +3,7 @@ import time
 import json
 import re
 import math
+import sys
 
 def remove_stopwords(text):
     text_cleaned = []
@@ -22,7 +23,10 @@ def remove_stopwords(text):
                     else:
                         text_cleaned.append(word)
             else:
-                text_cleaned.append(w)
+                if w in stop_words:
+                    continue
+                else:
+                    text_cleaned.append(w)
     return text_cleaned
 
 def calculate_tf(document):
@@ -42,14 +46,17 @@ def calculate_tf(document):
 
 if __name__ == "__main__":
     start = time.time()
+    # input_fp = sys.argv[1]
+    # output_model = sys.argv[2]
+    # stopwords_fp = sys.argv[3]
     input_fp = "./data/train_review.json"
-    output_model = "./data/task2_model"
+    output_model = "./data/task2.model"
     stopwords_fp = "./data/stopwords"
 
     conf = SparkConf()
-    conf.set("spark.executor.memory", "4g")
-    conf.set("spark.driver.memory", "4g")
-    sc = SparkContext.getOrCreate(conf)
+    conf.set("spark.executor.memory", "8g")
+    conf.set("spark.driver.memory", "8g")
+    sc = SparkContext(conf=conf)
 
     stop_words = [word.strip() for word in open(stopwords_fp)]
     stop_words = stop_words + [""]  #In case empty string returns.
@@ -85,8 +92,7 @@ if __name__ == "__main__":
                 .map(lambda b_wtfidfL: (b_wtfidfL[0], sorted(b_wtfidfL[1], key = lambda x: -x[1])[:200])) \
                 .collectAsMap()
 
-                #.map(lambda b_wtfidfL: (b_wtfidfL[0], [w_tfidl[0] for w_tfidl in b_wtfidfL[1]]))
-        # Format business_profile in dictionary:
+    # Format business_profile in dictionary:
     business_profiles = {b: [w[0] for w in wtfidfL] for b, wtfidfL in business_profiles_w_score.items()}
 
     # Create user_profile:
@@ -107,13 +113,12 @@ if __name__ == "__main__":
         output_d = {}
         for b, wL in business_profiles.items():
             business_arr.append({'business_id': b, 'feature_vector': wL})
-            #w.write(json.dumps({'business_id': b, 'feature_vector': wL}))
-            #w.write("\n")
         output_d["business"] = business_arr
 
         for u, wL in user_profiles.items():
             user_arr.append({'user_id': u, 'feature_vector': wL})
-            #w.write(json.dumps({'user_id': u, 'feature_vector': wL}))
-            #w.write("\n")
         output_d["user"] = user_arr
         w.write(json.dumps(output_d))
+
+    end = time.time()
+    print("Duration:", round((end-start),2))

@@ -15,9 +15,9 @@ def cos_similarity(user_k, bus_k, user_features_d, bus_features_d):
 
 if __name__ == "__main__":
     start = time.time()
-    #input_fp = sys.argv[1]
-    #model_fp = sys.argv[2]
-    #output_fp = sys.argv[3]
+    # input_fp = sys.argv[1]
+    # model_fp = sys.argv[2]
+    # output_fp = sys.argv[3]
 
     input_fp = "./data/test_review.json"
     model_fp = "./data/task2.model"
@@ -60,4 +60,4 @@ if __name__ == "__main__":
 
     w.close()
     end = time.time()
-    print("Duration:", round((end-start),2))
+    print("Duration:", round((end-start), 2))
