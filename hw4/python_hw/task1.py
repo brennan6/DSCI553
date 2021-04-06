@@ -7,12 +7,11 @@ import time
 
 os.environ["PYSPARK_SUBMIT_ARGS"] = ("--packages graphframes:graphframes:0.6.0-spark2.3-s_2.11")
 
-def generate_graph(user_busList, t):
-    edges = []
-    vertices = []
+def generate_graph_components(user_busList, t):
+    edges, vertices = [], []
     for user1 in user_busList:
         for user2 in user_busList:
-            if user1[0] != user2[0]:
+            if user1[0] is not user2[0]:
                 set1, set2 = set(user1[1]), set(user2[1])
                 if len(set1.intersection(set2)) >= t:
                     vertices.append((user1[0],))
@@ -50,7 +49,7 @@ if __name__ == "__main__":
                 .map(lambda u_bL: (u_bL[0], list(set(u_bL[1])))) \
                 .collect()
 
-    edges, vertices = generate_graph(user_busList, filter_threshold)
+    edges, vertices = generate_graph_components(user_busList, filter_threshold)
 
     vertices = sqlc.createDataFrame(vertices, ["id"])
     edges = sqlc.createDataFrame(edges, ["src", "dst"])
