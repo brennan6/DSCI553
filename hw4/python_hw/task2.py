@@ -5,7 +5,6 @@ import math
 import time
 import random
 
-
 def calculate_betweenness(node, adjacent_edges):
     """Create the graph given the starting node, calculate betweenness, return all edge scores."""
     tree_graph = defaultdict(list)
@@ -88,16 +87,16 @@ def generate_graph_components(user_busList, t):
 
     return list(set(edges)), list(set(vertices)), adjacent_edges
 
-
-def create_communities(vertices, adj_edges):
-    total_vertices = len(vertices)
+def create_communities(verts_left, adj_edges):
+    """Create communities by removing vertices that have been examined for children."""
+    total_vertices = len(verts_left)
     communities = []
     visited_global = set()
-    print("Target:", total_vertices)
+    #print("Target:", total_vertices)
     while len(visited_global) < total_vertices:
-        print("Visited:", len(visited_global))
-        node_1 = random.choice(vertices)
-        visited_local = set([node_1])
+        #print("Visited:", len(visited_global))
+        node_1 = random.choice(verts_left)
+        visited_local = {node_1}
         adj_nodes = adj_edges[node_1]
 
         while True:
@@ -114,12 +113,12 @@ def create_communities(vertices, adj_edges):
                 break
 
         communities.append(list(visited_local))
-        vertices = list(set(vertices).difference(visited_global))
-
+        verts_left = list(set(verts_left).difference(visited_global))
     return communities
 
 
 def modularity(communities, m):
+    """Calculate the modularity of the communities as specified"""
     mod_ = 0
     for comm_ in communities:
         s_mod = 0
@@ -129,7 +128,7 @@ def modularity(communities, m):
                     a = 1
                 else:
                     a = 0
-                s_mod += (a - (K[i] * K[j])) / (2 * m)
+                s_mod += (a - ((K[i] * K[j]) / (2 * m)))
         mod_ += s_mod
 
     return mod_ / (2 * m)
@@ -137,15 +136,15 @@ def modularity(communities, m):
 
 if __name__ == "__main__":
     start = time.time()
-    # filter_threshold = int(sys.argv[1])
-    # input_fp = sys.argv[2]
-    # bwness_output_fp = sys.argv[3]
-    # comm_output_fp = sys.argv[4]
+    filter_threshold = int(sys.argv[1])
+    input_fp = sys.argv[2]
+    bwness_output_fp = sys.argv[3]
+    comm_output_fp = sys.argv[4]
 
-    filter_threshold = 7
-    input_fp = "./data/ub_sample_data.csv"
-    bwness_output_fp = "./data/output2_bwness.txt"
-    comm_output_fp = "./data/output2_comm.txt"
+    # filter_threshold = 7
+    # input_fp = "./data/ub_sample_data.csv"
+    # bwness_output_fp = "./data/output2_bwness.txt"
+    # comm_output_fp = "./data/output2_comm.txt"
 
     conf = SparkConf()
     conf.set("spark.executor.memory", "4g")
@@ -201,6 +200,7 @@ if __name__ == "__main__":
     cuts = 0
     best_mod_ = -math.inf
     while cuts < m:
+        #print(cuts)
         # Make the cut based on highest betweenness, remove from adjacent_edge list:
         del_edge = betweeness_lst[0]
         p1, p2 = del_edge[0][0], del_edge[0][1]
@@ -218,7 +218,7 @@ if __name__ == "__main__":
 
         if best_mod_ < mod_:
             best_mod_ = mod_
-            print("Best Mod:", mod_)
+            #print("Best Mod:", mod_)
             best_communities = communities
 
         # Run through G-N to extract betweenness to remove next edge:
@@ -233,7 +233,6 @@ if __name__ == "__main__":
     # Sort each list of list lexigraphically first:
     best_communities = [sorted(sublst) for sublst in best_communities]
     community_list = sorted(best_communities, key=lambda x: (len(x), x))
-
     with open(comm_output_fp, "w") as w:
         for community in community_list:
             comm_len = len(community)
