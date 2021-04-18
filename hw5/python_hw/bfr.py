@@ -16,7 +16,6 @@ def kmeans(data, n, max_iter):
     iter_cnt = 0
     centroids_ = initialize_centroids(data, n) #{c#0: {"MEAN": [m1, ... md], {"SUMSQ_N": [s1, ... sd]}, c#1: ...}
     cluster_pts_d = defaultdict(list)  #{c#0: [p1, p5, ...], c#1: [...]}
-    has_stabilized = False
     prev_cluster_pts = None
 
     while True:
@@ -161,6 +160,30 @@ def change_centroids_non_kmeans(new_data, cluster_d, new_cluster_pts):
     #print(centroids_)
     return cluster_d
 
+def change_mean_on_cs_merge(cs1_values, cs2_values):
+    cs1_mean_vector = cs1_values["MEAN"]
+    cs2_mean_vector = cs2_values["MEAN"]
+
+    cs1_n = cs1_values["N"]
+    cs2_n = cs2_values["N"]
+
+    new_mean_vector = [(cs1_n*cs1_mean + cs2_n*cs2_mean) / (cs1_n + cs2_n) for (cs1_mean, cs2_mean) in zip(cs1_mean_vector, cs2_mean_vector)]
+    #print("New Mean:")
+    #print(new_mean_vector)
+    return new_mean_vector
+
+def change_sumsq_on_cs_merge(cs1_values, cs2_values):
+    cs1_sumsq_vector = cs1_values["SUMSQ_N"]
+    cs2_sumsq_vector = cs2_values["SUMSQ_N"]
+
+    cs1_n = cs1_values["N"]
+    cs2_n = cs2_values["N"]
+
+    new_sumsq_vector = [(cs1_n*cs1_sumsq + cs2_n*cs2_sumsq) / (cs1_n + cs2_n) for (cs1_sumsq, cs2_sumsq) in zip(cs1_sumsq_vector, cs2_sumsq_vector)]
+    #print("New SUMSQ:")
+    #print(new_sumsq_vector)
+    return new_sumsq_vector
+
 def merge_cs_clusters(cs_clusters):
     clusters_unmerged = set(cs_clusters.keys())
     for cs_pair in combinations(cs_clusters.keys(), 2):
@@ -183,11 +206,43 @@ def merge_cs_clusters(cs_clusters):
                 clusters_unmerged.discard(cs2)
 
                 cs_clusters[cs1] = new_cluster_info
-
         else:
             continue
+    return cs_clusters
 
+def merge_cs_to_ds_clusters(ds_clusters, cs_clusters):
+    cs_clusters_copy = cs_clusters
+    for c_cs, v_cs in cs_clusters_copy.items():
+        dist_d = {}
+        for c_ds, v_ds in ds_clusters.items():
+            dist_ = mahalanobis_distance(v_ds["MEAN"], v_cs["MEAN"], v_ds["STD"])
+            dist_d[c_ds] = dist_
 
+        dist_d = sorted(dist_d.items(), key=lambda item: item[1])
+        ds_winner = dist_d[0][0]
+
+        #Just add pts to new ds:
+        ds_clusters[ds_winner]["PTS"] = ds_clusters[ds_winner]["PTS"] + v_cs["PTS"]
+        #del cs_clusters[c_cs]
+
+    return ds_clusters, cs_clusters
+
+def merge_rs_to_ds_clusters(ds_clusters, rs):
+    rs_copy = rs
+    for k_rs in rs_copy.keys():
+        dist_d = {}
+        for c_ds, v_ds in ds_clusters.items():
+            dist_ = mahalanobis_distance(v_ds["MEAN"], rs[k_rs], v_ds["STD"])
+            dist_d[c_ds] = dist_
+
+        dist_d = sorted(dist_d.items(), key=lambda item: item[1])
+        ds_winner = dist_d[0][0]
+
+        #Just add new pt to new ds:
+        ds_clusters[ds_winner]["PTS"] = ds_clusters[ds_winner]["PTS"] + k_rs
+        #del rs[k_rs]
+
+    return ds_clusters, rs
 
 if __name__ == "__main__":
     start = time.time()
@@ -197,7 +252,7 @@ if __name__ == "__main__":
     # output_fp_inter = sys.argv[4]
 
     input_fp = "./data/test1"
-    n_clusters = 15
+    n_clusters = 10
     output_fp_cluster = "./output/cluster1.json"
     output_fp_inter = "./output/intermediate.csv"
 
@@ -214,8 +269,10 @@ if __name__ == "__main__":
 
     headers = ["round_id", "nof_cluster_discard", "nof_point_discard",
                "nof_cluster_compression", "nof_point_compression", "nof_point_retained"]
-
+    inter_results = {}
+    inter_results["headers"] = headers
     for i, file in enumerate(os.listdir(input_fp)):
+        print("File #:", i)
         curr_fp = input_fp + "/" + file
 
         data_rdd = sc.textFile(curr_fp)
@@ -326,17 +383,21 @@ if __name__ == "__main__":
             # print(new_rs)
 
             #Merge new DS points with old DS points:
+            tot_pts_ds = 0
             for c, v in ds_stats_pts.items():
                 #print("Before len:", len(ds_stats_pts[c]["PTS"]))
                 #print("Addition:", len(new_ds_stats_pts[c]))
                 ds_stats_pts[c]["PTS"] = v["PTS"] + new_ds_stats_pts[c]
+                tot_pts_ds += len(ds_stats_pts[c]["PTS"])
                 #print("After len:", len(ds_stats_pts[c]["PTS"]))
             ds_stats_pts = change_centroids_non_kmeans(new_data, ds_stats_pts, new_ds_stats_pts)
 
+            tot_pts_cs = 0
             for c, v in cs_stats_pts.items():
                 #print("Before len:", len(cs_stats_pts[c]["PTS"]))
                 #print("Addition:", len(new_ds_stats_pts[c]))
                 cs_stats_pts[c]["PTS"] = v["PTS"] + new_cs_stats_pts[c]
+                tot_pts_cs += len(cs_stats_pts[c]["PTS"])
                 #print("After len:", len(ds_stats_pts[c]["PTS"]))
             cs_stats_pts = change_centroids_non_kmeans(new_data, cs_stats_pts, new_cs_stats_pts)
 
@@ -360,7 +421,7 @@ if __name__ == "__main__":
                         cs_stats_pts[new_c_key]["PTS"] = rs_cluster_pts[c]
                         cs_stats_pts[new_c_key]["N"] = len(rs_cluster_pts[c])
 
-                generate_std_key(cs_stats_pts)
+                #generate_std_key(cs_stats_pts)
                 rs.clear()
                 rs = new_rs
 
@@ -368,29 +429,39 @@ if __name__ == "__main__":
             cs_stats_pts = merge_cs_clusters(cs_stats_pts)
             cs_stats_pts = generate_std_key(cs_stats_pts)
 
+            if i == len(os.listdir(input_fp))-1:
+                print("FINAL MERGE")
+                if len(cs_stats_pts.keys()) != 0:
+                    ds_stats_pts, cs_stats_pts = merge_cs_to_ds_clusters(ds_stats_pts, cs_stats_pts)
 
-            break
+                if len(rs.keys()) != 0:
+                    ds_stats_pts, rs = merge_rs_to_ds_clusters(ds_stats_pts, rs)
 
+                tot_pts_ds = 0
+                for c, v in ds_stats_pts.items():
+                    tot_pts_ds += len(ds_stats_pts[c]["PTS"])
 
+                cs_stats_pts.clear()
+                rs.clear()
+                tot_pts_cs = 0
 
-
-
-
-
-
-
-
-
-        inter_results = {}
         inter_results[i] = [i+1, len(ds_stats_pts), tot_pts_ds, len(cs_stats_pts), tot_pts_cs, len(rs)]
 
         with open(output_fp_inter, "w+") as w:
             writer = csv.writer(w)
-            if i == 0:
-                writer.writerow(headers)
             for k, v in inter_results.items():
                 writer.writerow(v)
 
+        #Organize DS_cluster results:
+        results = {}
+        for c, v in ds_stats_pts.items():
+            c_pts = v["PTS"]
+            for pt in c_pts:
+                results[pt] = c
+
+        results = dict(sorted(results.items(), key=lambda item: item[0]))
+        with open(output_fp_cluster, "w") as w:
+            w.write(json.dumps(results))
 
 
 
