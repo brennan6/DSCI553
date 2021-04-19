@@ -59,7 +59,7 @@ def change_centroids(data, cluster_d):
     """Change the centroids based on the new points that are associated with each cluster."""
     centroids_ = defaultdict(dict)
     for c, pts_list in cluster_d.items():
-        print("centroid #", c)
+        #print("centroid #", c)
         centroid_data = []
         for pt_idx in pts_list:
             pt_data = data[pt_idx]
@@ -71,8 +71,8 @@ def change_centroids(data, cluster_d):
         centroids_[c]["MEAN"] = [sum(i) / len(i) for i in zip(*centroid_data)]   #SUM/N
         centroids_[c]["SUMSQ_N"] = [sum([v ** 2 for v in i]) / len(i) for i in zip(*centroid_data)] #SUMSQ/N
 
-    print("New Centroids:")
-    print(centroids_)
+    #print("New Centroids:")
+    #print(centroids_)
     return centroids_
 
 def check_stability(old_cluster, new_cluster):
@@ -99,20 +99,24 @@ def mahalanobis_distance(c1, p2, std):
 
 def initialize_centroids(data, n):
     """Initialize centroids with form: {centroid #: row #}"""
-    random_pts = random.sample(data.keys(), n)
+    if len(data.keys()) < n:  #Deals with the case when RS only has a few data points
+        random_pts = random.sample(data.keys(), len(data.keys()))
+    else:
+        random_pts = random.sample(data.keys(), n)
     init_centroids = defaultdict(dict)
     for i, key in enumerate(random_pts):
         init_centroids[i]["MEAN"] = data[key]
         init_centroids[i]["SUMSQ_N"] = 0
 
-    print("Intital Centroid:")
-    print(init_centroids)
+    #print("Intital Centroid:")
+    #print(init_centroids)
     return init_centroids
 
 def generate_std_key(ds_stats):
     """Generate the STD Key for the ds clusters using SUMSQ_N vector and MEAN vector."""
     for c, v in ds_stats.items():
         std_vector = [math.sqrt(sumsq_n - sum_n**2) for (sumsq_n, sum_n) in zip(v["SUMSQ_N"], v["MEAN"])]
+        std_vector = [i if i != 0 else .01 for i in std_vector]
         ds_stats[c]["STD"] = std_vector
     return ds_stats
 
@@ -132,14 +136,14 @@ def change_centroids_non_kmeans(new_data, cluster_d, new_cluster_pts):
 
         new_mean_vector = [sum(i) for i in zip(*centroid_data)]   #SUM/N
 
-        # print("Old Mean Vector:")
-        # print(v["MEAN"])
+        #print("Old Mean Vector:")
+        #print(v["MEAN"])
         new_N = len(centroid_data)
         old_N = v["N"]
         cluster_d[c]["MEAN"] = [(new_sum + (old_mean*old_N)) / (new_N + old_N) for (new_sum, old_mean) in zip(new_mean_vector, v["MEAN"])]
 
-        # print("New Mean Vector:")
-        # print(centroids_[c]["MEAN"])
+        #print("New Mean Vector:")
+        #print(cluster_d[c]["MEAN"])
         #
         # print("Old SUMSQ_N Vector:")
         # print(v["SUMSQ_N"])
@@ -239,22 +243,22 @@ def merge_rs_to_ds_clusters(ds_clusters, rs):
         ds_winner = dist_d[0][0]
 
         #Just add new pt to new ds:
-        ds_clusters[ds_winner]["PTS"] = ds_clusters[ds_winner]["PTS"] + k_rs
+        ds_clusters[ds_winner]["PTS"] = ds_clusters[ds_winner]["PTS"] + [k_rs]
         #del rs[k_rs]
 
     return ds_clusters, rs
 
 if __name__ == "__main__":
     start = time.time()
-    # input_fp = sys.argv[1]
-    # n_clusters = int(sys.argv[2])
-    # output_fp_cluster = sys.argv[3]
-    # output_fp_inter = sys.argv[4]
+    input_fp = sys.argv[1]
+    n_clusters = int(sys.argv[2])
+    output_fp_cluster = sys.argv[3]
+    output_fp_inter = sys.argv[4]
 
-    input_fp = "./data/test1"
-    n_clusters = 10
-    output_fp_cluster = "./output/cluster1.json"
-    output_fp_inter = "./output/intermediate.csv"
+    # input_fp = "./data/test5"
+    # n_clusters = 10
+    # output_fp_cluster = "./output/cluster5.json"
+    # output_fp_inter = "./output/intermediate.csv"
 
     conf = SparkConf()
     conf.set("spark.executor.memory", "8g")
@@ -271,7 +275,7 @@ if __name__ == "__main__":
                "nof_cluster_compression", "nof_point_compression", "nof_point_retained"]
     inter_results = {}
     inter_results["headers"] = headers
-    for i, file in enumerate(os.listdir(input_fp)):
+    for i, file in enumerate(sorted(os.listdir(input_fp))):
         print("File #:", i)
         curr_fp = input_fp + "/" + file
 
@@ -308,15 +312,20 @@ if __name__ == "__main__":
             #Create CS Sets using K*3 clusters:
             cs_cluster_info, cs_cluster_pts = kmeans(remaining_data, n_clusters*3, 5)
 
+            cs_to_remove = []
             for c, pts_lst in cs_cluster_pts.items():
                 if len(pts_lst) == 0:
-                    del cs_cluster_info[c]
-                    del cs_cluster_pts[c]
+                    #del cs_cluster_info[c]
+                    #del cs_cluster_pts[c]
+                    cs_to_remove.append(c)
                 elif len(pts_lst) == 1:
                     data_pt_idx = pts_lst[0]
                     rs[data_pt_idx] = remaining_data[data_pt_idx]
-                    del cs_cluster_info[c]
-                    del cs_cluster_pts[c]
+                    #del cs_cluster_info[c]
+                    #del cs_cluster_pts[c]
+                    cs_to_remove.append(c)
+            cs_cluster_info = {key: cs_cluster_info[key] for key in cs_cluster_info if key not in cs_to_remove}
+            cs_cluster_pts = {key: cs_cluster_pts[key] for key in cs_cluster_info if key not in cs_to_remove}
 
             cs_stats_pts = cs_cluster_info
             tot_pts_cs = 0
@@ -403,25 +412,29 @@ if __name__ == "__main__":
 
             #Run Clustering Alg. on RS:
             if len(rs.keys()) != 0:
+                #print("RS Keys:", len(rs.keys()))
                 rs_cluster_info, rs_cluster_pts = kmeans(rs, n_clusters * 3, 5)
             #Add RS Clusters to current cluster list if more than 1:
                 new_rs = defaultdict(list)
+                rs_to_remove = []
                 for c, pts_lst in rs_cluster_pts.items():
                     if len(pts_lst) == 0:
-                        del rs_cluster_info[c]
-                        del rs_cluster_pts[c]
+                        #del rs_cluster_info[c]
+                        #del rs_cluster_pts[c]
+                        rs_to_remove.append(c)
                     elif len(pts_lst) == 1:
                         data_pt_idx = pts_lst[0]
                         new_rs[data_pt_idx] = rs[data_pt_idx]
-                        del rs_cluster_info[c]
-                        del rs_cluster_pts[c]
+                        #del rs_cluster_info[c]
+                        #del rs_cluster_pts[c]
+                        rs_to_remove.append(c)
                     else:
                         new_c_key = len(cs_stats_pts.keys())
                         cs_stats_pts[new_c_key] = rs_cluster_info[c]
                         cs_stats_pts[new_c_key]["PTS"] = rs_cluster_pts[c]
                         cs_stats_pts[new_c_key]["N"] = len(rs_cluster_pts[c])
 
-                #generate_std_key(cs_stats_pts)
+                generate_std_key(cs_stats_pts)
                 rs.clear()
                 rs = new_rs
 
