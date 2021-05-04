@@ -12,7 +12,7 @@ os.environ["PYSPARK_PYTHON"] = '/usr/local/bin/python3.6'
 os.environ["PYSPARK_DRIVER_PYTHON"] = '/usr/local/bin/python3.6'
 
 SIGN_COUNT = 60
-BANDS_COUNT = 30
+BANDS_COUNT = 60
 
 def minhash(business_len):
     index_hash_dict = defaultdict(list)
@@ -31,14 +31,13 @@ def reduce_signature(signature_lsts):
 
 def get_lsh_combinations(sign_matrix):
     """Check similarity between hashed signatures across bands."""
-    print("LSH Combinations.")
     idx_ = 0
     stop_idx = math.floor((SIGN_COUNT/BANDS_COUNT)-1)
     candidates = []
     for band_num in range(BANDS_COUNT):
         d_ = defaultdict(list)
         for sign_ in sign_matrix:
-            band_sign = sign_[1][idx_:stop_idx]
+            band_sign = sign_[1][idx_:idx_+1]
             d_[hash(tuple(band_sign))].append(sign_[0])
 
         for hashed_sign, b_id_list in d_.items():
@@ -48,7 +47,6 @@ def get_lsh_combinations(sign_matrix):
 
         idx_+=int(SIGN_COUNT/BANDS_COUNT)
         stop_idx+=int(SIGN_COUNT/BANDS_COUNT)
-    print("END LSH")
     return candidates
 
 def get_jaccard_similarity(u1_bus_stars, u2_bus_stars):
@@ -94,15 +92,15 @@ def check_pearson_similarity(b1_user_stars, b2_user_stars):
 if __name__ == "__main__":
     start = time.time()
 
-    # input_fp = "../resource/asnlib/publicdata/train_review.json"
-    # user_friends_fp = "../resource/asnlib/publicdata/user.json"
-    # cf_model = "./item_based_cf.model"
-    # content_model = "./content.model"
+    input_fp = "../resource/asnlib/publicdata/train_review.json"
+    user_friends_fp = "../resource/asnlib/publicdata/user.json"
+    cf_model = "./item_based_cf.model"
+    content_model = "./content.model"
 
-    input_fp = "./data/train_review.json"
-    user_friends_fp = "./data/user.json"
-    cf_model = "./output/item_based_cf.model"
-    content_model = "./output/content.model"
+    # input_fp = "./data/train_review.json"
+    # user_friends_fp = "./data/user.json"
+    # cf_model = "./output/item_based_cf.model"
+    # content_model = "./output/content.model"
 
     # conf = SparkConf().set('spark.driver.host', '127.0.0.1')
     conf = SparkConf()
@@ -119,7 +117,7 @@ if __name__ == "__main__":
     bus_user_ratings = user_bus_stars_rdd \
                     .map(lambda u_b_s: (u_b_s[1], (u_b_s[0], u_b_s[2]))) \
                     .groupByKey() \
-                    .filter(lambda b_usL: len(b_usL[1]) >= 3) \
+                    .filter(lambda b_usL: len(b_usL[1]) >= 5) \
                     .map(lambda b_usL: (b_usL[0], list(b_usL[1]))) \
                     .collectAsMap()
 
@@ -172,18 +170,6 @@ if __name__ == "__main__":
         pearson_sim = check_pearson_similarity(b1_user_stars, b2_user_stars)
         if pearson_sim > 0:
             output_pairs.append((b1, b2, pearson_sim))
-
-        # business_lst = bus_user_ratings.keys()
-        #
-        # output_pairs = []
-        # for pair in combinations(business_lst, 2):
-        #     b1_user_stars = dict(bus_user_ratings[pair[0]])
-        #     b2_user_stars = dict(bus_user_ratings[pair[1]])
-        #
-        #     pearson_sim = check_pearson_similarity(b1_user_stars, b2_user_stars)
-        #
-        #     if pearson_sim > 0:
-        #         output_pairs.append((pair[0], pair[1], pearson_sim))
 
     with open(cf_model, "w") as w:
         for b1_b2_sim in output_pairs:

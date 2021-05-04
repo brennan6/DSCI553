@@ -2,26 +2,11 @@ from pyspark import SparkContext, SparkConf
 import time
 import json
 import os
-import re
-import math
 import sys
 
 os.environ["PYSPARK_PYTHON"] = '/usr/local/bin/python3.6'
 os.environ["PYSPARK_DRIVER_PYTHON"] = '/usr/local/bin/python3.6'
 OVERALL_AVG = 3.8
-
-def merge_if_possible_item(u1, user_business_ratings):
-    if u1 in user_business_ratings:
-        return user_business_ratings[u1]
-    else:
-        return []
-
-def merge_if_possible_user(b1, bus_user_ratings):
-    if b1 in bus_user_ratings:
-        return bus_user_ratings[b1]
-    else:
-        return []
-
 
 def get_predictions(ub_score_list, model, avg_d):
     """Use the Pearson Similarity Scoring for Predictions."""
@@ -62,6 +47,7 @@ def get_predictions(ub_score_list, model, avg_d):
     return (u1, b1, rating)
 
 def get_friends_recs(user_business, user_friends_d):
+    """Content Based approach to deal with Cold Start Problem. Uses friends Influence when applicable."""
     u1 = user_business[0]
     b1 = user_business[1]
     hasBusinessAvg = False
@@ -90,21 +76,21 @@ def get_friends_recs(user_business, user_friends_d):
         if friends_avg != 0:
             hasFriendsAvg = True
 
-    if hasBusinessAvg is False and hasUserAvg is True:
-        final_score = .8*user_avg + .2*OVERALL_AVG
+    if hasBusinessAvg is False and hasUserAvg is True: #("cthsjdnfaksdnfa", 2021)
+        final_score = .9*user_avg + .1*OVERALL_AVG
         return (u1, b1, final_score)
-    elif hasBusinessAvg is True and hasUserAvg is False:
+    elif hasBusinessAvg is True and hasUserAvg is False: #(2021, "cthsjdnfaksdnfa")
         if hasFriendsAvg:
-            final_score = .8*friends_avg + .2*business_avg
+            final_score = .8*friends_avg + .2*business_avg #w/ friends
             return (u1, b1, final_score)
         else:
-            final_score = .8*business_avg + .2*OVERALL_AVG
+            final_score = .1*business_avg + .9*OVERALL_AVG
             return (u1, b1, final_score)
-    else:
+    else: #(2021, 2021)
         return (u1, b1, OVERALL_AVG)
 
-
 def adjust_prediction(user, bus, cf_score):
+    """Weighted Averages between CF scores and overall averages across respective Users and Businesses."""
     if user in user_avg_d:
         avg_user = user_avg_d[user]
     else:
@@ -115,17 +101,13 @@ def adjust_prediction(user, bus, cf_score):
     else:
         avg_bus = OVERALL_AVG
 
-    avg_user_bus = .6*avg_bus + .4*avg_user
+    avg_user_bus = .7*avg_bus + .3*avg_user
 
-    if avg_user_bus > 1.5:
-        if avg_user_bus > 4.4:
-            return cf_score*.1 + avg_user_bus*.9
-        else:
-            return cf_score*.8 + avg_user_bus*.2
-    else:
+    if avg_user_bus < 1.25:
         output_score = .2*cf_score + .8*avg_user_bus
         return output_score
-
+    else:
+        return cf_score*.1 + avg_user_bus*.9 #.1 w/ .9 caused 1.19237 and 1.19384
 
 if __name__ == "__main__":
     start = time.time()
@@ -211,8 +193,6 @@ if __name__ == "__main__":
                     .groupByKey() \
                     .map(lambda u_bsL: (u_bsL[0], list(u_bsL[1])))
 
-    print(user_business_test_rdd.count())
-
     user_business_test_mapped = user_business_test_rdd \
                     .map(lambda u_b: (user_idx_d[u_b[0]] if u_b[0] in user_idx_d
                                                         else u_b[0],
@@ -229,8 +209,6 @@ if __name__ == "__main__":
         .map(lambda ub_brL: get_predictions(ub_brL, b1_b2_sim_model_rdd, bus_avg_d)) \
         .map(lambda u_b_r: (u_b_r[0], u_b_r[1], adjust_prediction(u_b_r[0], u_b_r[1], u_b_r[2]))) \
         .collect()
-
-    print(len(user_business_rating))
 
     #Utilize friends for additional content:
     # Read in the model data: {(b1,b2): sim}
